@@ -1,0 +1,64 @@
+version: 0.2
+phases:
+  pre_build:
+    commands:
+      ##### 環境変数の定義 ###################################
+      # APP_NAME, APP_ENV はcodeBuildの環境変数を設定している。
+      # envディレクティブで設定していないのはスクリプトで定義している部分があるため。
+      # AWSのアカウントIDを$CODEBUILD_BUILD_ARNから取得
+      #      - OLDIFS=$IFS && IFS=':' && set -- ${CODEBUILD_BUILD_ARN} && AWS_ACCOUNT_ID=$5 && IFS=$OLDIFS
+      - AWS_ACCOUNT_ID=$(echo ${CODEBUILD_BUILD_ARN} | cut -f 5 -d :)
+      - ROOT_DIR=`pwd`
+      - REPOSITORY_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/laravel-test
+      # gitのコミットID
+      - COMMIT_HASH=`echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-9`
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - PROJECT_DIR=${ROOT_DIR}
+      - SRC_DIR=${ROOT_DIR}/src
+      - DOCKER_DIR=${ROOT_DIR}/docker
+      # 下記のDockerfileが変更されていたらイメージをビルドしてECRへpushする
+      - CACHE_DIR=${ROOT_DIR}/cache
+      - ARTIFACTS_DIR_NAME=artifacts
+      - ARTIFACTS_DIR=${ROOT_DIR}/${ARTIFACTS_DIR_NAME}
+      - IMGDEF_JSON_FILE=${ARTIFACTS_DIR}/imagedefinitions.json
+      # 環境変数初期値表示
+      - |
+        echo ">>> ENVs ->"
+        echo ">>>     AWS_ACCOUNT_ID: ${AWS_ACCOUNT_ID}"
+        echo ">>>     ROOT_DIR: ${ROOT_DIR}"
+        echo ">>>     REPOSITORY_URI: ${REPOSITORY_URI}"
+        echo ">>>     COMMIT_HASH: ${COMMIT_HASH}"
+        echo ">>>     IMAGE_TAG: ${IMAGE_TAG}"
+        echo ">>>     PROJECT_DIR: ${PROJECT_DIR}"
+        echo ">>>     DOCKER_DIR: ${DOCKER_DIR}"
+        echo ">>>     CACHE_DIR: ${CACHE_DIR}"
+        echo ">>>     ARTIFACTS_DIR_NAME: ${ARTIFACTS_DIR_NAME}"
+        echo ">>>     ARTIFACTS_DIR: ${ARTIFACTS_DIR}"
+        echo ">>>     IMGDEF_JSON_FILE: ${IMGDEF_JSON_FILE}"
+      # ECRのリポジトリにログイン
+      - aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${REPOSITORY_URI}
+
+      - mkdir ${ARTIFACTS_DIR}
+
+  build:
+    commands:
+      - IMAGE=${REPOSITORY_URI}:${IMAGE_TAG}
+      - docker build -f docker/php/Dockerfile --target ecs -t "${IMAGE}" ./
+      - docker images
+      - docker push ${IMAGE}
+      - IMGDEF_JSON=$(printf '{"name":"%s", "imageUri":"%s"},' 'laravel' "${IMAGE}")
+
+    #   ##### imagedefinitions.jsonの書き込み ###################################
+      - IMGDEF_JSON="["${IMGDEF_JSON:0:${#IMGDEF_JSON}-1}"]"
+      - echo ${IMGDEF_JSON}
+      - echo ${IMGDEF_JSON} > ${IMGDEF_JSON_FILE}
+
+artifacts:
+  files:
+    - '**/*'
+  discard-paths: no
+  base-directory: artifacts
+
+cache:
+  paths:
+    - './cache/**/*'
