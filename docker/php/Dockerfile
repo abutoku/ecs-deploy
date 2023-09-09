@@ -1,5 +1,6 @@
 FROM public.ecr.aws/docker/library/php:8.2.10-apache as base
 
+# 講義中の待ち時間を短縮するためインストールするextensionを大幅に省いています
 RUN \
 apt-get upgrade \
 && apt-get update && apt-get install -y \
