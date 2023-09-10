@@ -9,7 +9,7 @@ phases:
       #      - OLDIFS=$IFS && IFS=':' && set -- ${CODEBUILD_BUILD_ARN} && AWS_ACCOUNT_ID=$5 && IFS=$OLDIFS
       - AWS_ACCOUNT_ID=$(echo ${CODEBUILD_BUILD_ARN} | cut -f 5 -d :)
       - ROOT_DIR=`pwd`
-      - REPOSITORY_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/laravel-test
+      - REPOSITORY_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/laraveltest
       # gitのコミットID
       - COMMIT_HASH=`echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-9`
       - IMAGE_TAG=${COMMIT_HASH:=latest}
